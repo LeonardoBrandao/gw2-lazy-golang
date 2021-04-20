@@ -3,8 +3,7 @@ package main
 import (
 	"fmt"
 	"time"
-
-	"./utils"
+	"github.com/LeonardoBrandao/gw2-utility/utils"
 )
 
 type GithubRelease []struct {
