@@ -1,1 +1,1 @@
-# gw2-utility
+# gw2-lazy-golang
