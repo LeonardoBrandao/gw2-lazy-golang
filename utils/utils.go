@@ -9,13 +9,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 )
 
-func DownloadFile(filename string, filepath string, url string, addon string) {
+func DownloadAddon(gwpath string, tmpdir string, addon string, filename string, url string) {
+
+	filepath := path.Join(tmpdir, filename)
 
 	// Get the data
 	resp, err := http.Get(url)
@@ -41,21 +44,22 @@ func DownloadFile(filename string, filepath string, url string, addon string) {
 	iszip, err := regexp.MatchString(".zip", filename)
 	if iszip {
 		fmt.Println("unzipping " + addon)
-		Unzip("tmp/"+addon+"/"+filename, "addons/"+addon)
+
+		Unzip(path.Join(tmpdir, filename), path.Join(gwpath, "addons", addon))
 	}
 
 	isdll, err := regexp.MatchString(".dll", filename)
 	if isdll {
 		fmt.Println("copying " + addon)
 
-		src, err := os.Open("tmp/" + addon + "/" + filename)
+		src, err := os.Open(path.Join(tmpdir, filename))
 		if err != nil {
 			fmt.Println(err)
 		}
 		defer src.Close()
 
-		os.MkdirAll("addons/"+addon, 0755)
-		dest, err := os.Create("addons/" + addon + "/" + filename)
+		os.MkdirAll(path.Join(gwpath, "addons", addon), 0755)
+		dest, err := os.Create(path.Join(gwpath, "addons", addon, filename))
 		if err != nil {
 			fmt.Println(err)
 		}
