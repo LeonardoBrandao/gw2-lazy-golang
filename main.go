@@ -2,95 +2,62 @@ package main
 
 import (
 	"fmt"
-	"time"
+	"os"
+	"sync"
+
 	"github.com/LeonardoBrandao/gw2-utility/utils"
 )
 
-type GithubRelease []struct {
-	URL       string `json:"url"`
-	AssetsURL string `json:"assets_url"`
-	UploadURL string `json:"upload_url"`
-	HTMLURL   string `json:"html_url"`
-	ID        int    `json:"id"`
-	Author    struct {
-		Login             string `json:"login"`
-		ID                int    `json:"id"`
-		NodeID            string `json:"node_id"`
-		AvatarURL         string `json:"avatar_url"`
-		GravatarID        string `json:"gravatar_id"`
-		URL               string `json:"url"`
-		HTMLURL           string `json:"html_url"`
-		FollowersURL      string `json:"followers_url"`
-		FollowingURL      string `json:"following_url"`
-		GistsURL          string `json:"gists_url"`
-		StarredURL        string `json:"starred_url"`
-		SubscriptionsURL  string `json:"subscriptions_url"`
-		OrganizationsURL  string `json:"organizations_url"`
-		ReposURL          string `json:"repos_url"`
-		EventsURL         string `json:"events_url"`
-		ReceivedEventsURL string `json:"received_events_url"`
-		Type              string `json:"type"`
-		SiteAdmin         bool   `json:"site_admin"`
-	} `json:"author"`
-	NodeID          string    `json:"node_id"`
-	TagName         string    `json:"tag_name"`
-	TargetCommitish string    `json:"target_commitish"`
-	Name            string    `json:"name"`
-	Draft           bool      `json:"draft"`
-	Prerelease      bool      `json:"prerelease"`
-	CreatedAt       time.Time `json:"created_at"`
-	PublishedAt     time.Time `json:"published_at"`
-	Assets          []struct {
-		URL      string `json:"url"`
-		ID       int    `json:"id"`
-		NodeID   string `json:"node_id"`
-		Name     string `json:"name"`
-		Label    string `json:"label"`
-		Uploader struct {
-			Login             string `json:"login"`
-			ID                int    `json:"id"`
-			NodeID            string `json:"node_id"`
-			AvatarURL         string `json:"avatar_url"`
-			GravatarID        string `json:"gravatar_id"`
-			URL               string `json:"url"`
-			HTMLURL           string `json:"html_url"`
-			FollowersURL      string `json:"followers_url"`
-			FollowingURL      string `json:"following_url"`
-			GistsURL          string `json:"gists_url"`
-			StarredURL        string `json:"starred_url"`
-			SubscriptionsURL  string `json:"subscriptions_url"`
-			OrganizationsURL  string `json:"organizations_url"`
-			ReposURL          string `json:"repos_url"`
-			EventsURL         string `json:"events_url"`
-			ReceivedEventsURL string `json:"received_events_url"`
-			Type              string `json:"type"`
-			SiteAdmin         bool   `json:"site_admin"`
-		} `json:"uploader"`
-		ContentType        string    `json:"content_type"`
-		State              string    `json:"state"`
-		Size               int       `json:"size"`
-		DownloadCount      int       `json:"download_count"`
-		CreatedAt          time.Time `json:"created_at"`
-		UpdatedAt          time.Time `json:"updated_at"`
-		BrowserDownloadURL string    `json:"browser_download_url"`
+type GithubRelease struct {
+	URL    string `json:"url"`
+	Assets []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
-	TarballURL string `json:"tarball_url"`
-	ZipballURL string `json:"zipball_url"`
-	Body       string `json:"body"`
 }
 
 func main() {
+	var wg sync.WaitGroup
+	var d912pxyRelease GithubRelease
+	var gwradialRelease GithubRelease
 
-	var githubReleases GithubRelease
+	wg.Add(3)
 
-	err := utils.GetJson("https://api.github.com/repos/megai2/d912pxy/releases", &githubReleases)
+	err := utils.GetJson("https://api.github.com/repos/megai2/d912pxy/releases/latest", &d912pxyRelease)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+	}
+	err = utils.GetJson("https://api.github.com/repos/Friendly0Fire/GW2Radial/releases/latest", &gwradialRelease)
+	if err != nil {
+		fmt.Println(err)
 	}
 
-	err = utils.DownloadFile(githubReleases[0].Assets[0].Name, githubReleases[0].Assets[0].BrowserDownloadURL)
+	os.RemoveAll("tmp")
+	os.RemoveAll("addons_old")
+	err = os.Rename("addons", "addons_old")
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
 	}
-	fmt.Println("Downloaded: " + githubReleases[0].URL)
+	err = os.Mkdir("addons", 0755)
+	err = os.Mkdir("tmp", 0755)
+	err = os.Mkdir("tmp/arcdps", 0755)
+	err = os.Mkdir("tmp/d912pxy", 0755)
+	err = os.Mkdir("tmp/gwradial", 0755)
+	defer os.RemoveAll("tmp")
+
+	go func() {
+		defer wg.Done()
+		utils.DownloadFile(d912pxyRelease.Assets[0].Name, "tmp/d912pxy/"+d912pxyRelease.Assets[0].Name, d912pxyRelease.Assets[0].BrowserDownloadURL, "d912pxy")
+	}()
+	go func() {
+		defer wg.Done()
+		utils.DownloadFile(gwradialRelease.Assets[0].Name, "tmp/gwradial/"+gwradialRelease.Assets[0].Name, gwradialRelease.Assets[0].BrowserDownloadURL, "gwradial")
+	}()
+	go func() {
+		defer wg.Done()
+		utils.DownloadFile("d3d9.dll", "tmp/arcdps/d3d9.dll", "https://www.deltaconnected.com/arcdps/x64/d3d9.dll", "arcdps")
+	}()
+
+	wg.Wait()
+
 }
