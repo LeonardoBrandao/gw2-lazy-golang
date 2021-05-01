@@ -16,12 +16,49 @@ import (
 	"time"
 )
 
-func DownloadAddon(gwpath string, tmpdir string, addon string, filename string, url string) {
+type GithubRelease []struct {
+	URL    string `json:"url"`
+	Assets []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
+}
 
-	filepath := path.Join(tmpdir, filename)
+type Addon struct {
+	Name         string
+	Tmpdir       string
+	Extension    string
+	Download_url string
+}
+
+func PrettyPrint(i interface{}) string {
+	s, _ := json.MarshalIndent(i, "", "\t")
+	return string(s)
+}
+
+func GetJson(url string, target interface{}) error {
+	myClient := &http.Client{Timeout: 10 * time.Second}
+	response, err := myClient.Get(url)
+	if err != nil {
+		return err
+	}
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = json.Unmarshal(responseData, &target)
+	return err
+}
+
+func DownloadAddon(addon Addon) {
+	var fn strings.Builder
+	fn.WriteString(addon.Name)
+	fn.WriteString(addon.Extension)
+	filename := fn.String()
+	filepath := path.Join(addon.Tmpdir, filename)
 
 	// Get the data
-	resp, err := http.Get(url)
+	resp, err := http.Get(addon.Download_url)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -43,43 +80,9 @@ func DownloadAddon(gwpath string, tmpdir string, addon string, filename string, 
 
 	iszip, err := regexp.MatchString(".zip", filename)
 	if iszip {
-		fmt.Println("unzipping " + addon)
-
-		Unzip(path.Join(tmpdir, filename), path.Join(gwpath, "addons", addon))
+		fmt.Println("unzipping " + addon.Name)
+		Unzip(path.Join(addon.Tmpdir, filename), addon.Tmpdir)
 	}
-
-	isdll, err := regexp.MatchString(".dll", filename)
-	if isdll {
-		fmt.Println("copying " + addon)
-
-		src, err := os.Open(path.Join(tmpdir, filename))
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer src.Close()
-
-		os.MkdirAll(path.Join(gwpath, "addons", addon), 0755)
-		dest, err := os.Create(path.Join(gwpath, "addons", addon, filename))
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer dest.Close()
-		io.Copy(src, dest)
-	}
-}
-
-func GetJson(url string, target interface{}) error {
-	myClient := &http.Client{Timeout: 10 * time.Second}
-	response, err := myClient.Get(url)
-	if err != nil {
-		return err
-	}
-	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(responseData, &target)
-	return err
 }
 
 func Unzip(src string, dest string) ([]string, error) {
