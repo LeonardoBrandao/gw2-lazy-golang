@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/otiai10/copy"
 )
 
 type GithubRelease []struct {
@@ -139,4 +141,82 @@ func Unzip(src string, dest string) ([]string, error) {
 		}
 	}
 	return filenames, nil
+}
+
+// Find takes a slice and looks for an element in it.
+func Find(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}
+
+func CopyFiles(addons_list []Addon, addons_list_names []string, gwpath string) bool {
+	if _, err := os.Stat(path.Join(gwpath, "bin64")); os.IsNotExist(err) {
+		os.MkdirAll(path.Join(gwpath, "bin64"), 777)
+	}
+
+	os.RemoveAll(path.Join(gwpath, "bin64", "d3d9.dll"))
+	os.RemoveAll(path.Join(gwpath, "bin64", "d3d9_chainload.dll"))
+	os.RemoveAll(path.Join(gwpath, "bin64", "d912pxy.dll"))
+
+	for _, addon := range addons_list {
+		var filename string
+		switch addon.Name {
+		case "d912pxy":
+			if len(addons_list) == 3 { // arcdps, d912pxy, gwradial
+				filename = "d912pxy.dll"
+				break
+			}
+			if len(addons_list) == 2 && Find(addons_list_names, "arcdps") { // arcdps, d912pxy
+				filename = "d3d9_chainload.dll"
+				break
+			}
+			if len(addons_list) == 2 { // d912pxy, gwradial
+				filename = "d912pxy.dll"
+				break
+			}
+			filename = "d3d9.dll" // d912pxy
+			break
+		case "gwradial":
+			if len(addons_list) == 3 {
+				filename = "d3d9_chainload.dll" // arcdps, d912pxy, gwradial
+				break
+			}
+			if len(addons_list) == 2 && Find(addons_list_names, "arcdps") { // arcdps, gwradial
+				filename = "d3d9_chainload.dll"
+				break
+			}
+			filename = "d3d9.dll" // gwradial
+			break
+		default:
+			filename = "d3d9.dll" // arcdps will always be d3d9.dll
+			break
+		}
+		copyAddon(addon, filename, gwpath)
+	}
+	return true
+}
+
+func copyAddon(addon Addon, filename string, gwpath string) {
+	var err error
+	switch addon.Name {
+	case "arcdps":
+		err = copy.Copy(path.Join(addon.Tmpdir, "arcdps.dll"), path.Join(gwpath, "bin64", filename))
+		break
+	case "d912pxy":
+		err = copy.Copy(path.Join(addon.Tmpdir, addon.Name), path.Join(gwpath, addon.Name))
+		err = copy.Copy(path.Join(gwpath, addon.Name, "dll", "release", "d3d9.dll"), path.Join(gwpath, "bin64", filename))
+		break
+	case "gwradial":
+		err = copy.Copy(path.Join(addon.Tmpdir, "gw2addon_gw2radial.dll"), path.Join(gwpath, "bin64", filename))
+		break
+	}
+	if err != nil {
+		println(err)
+		println("Error while copying: ", addon.Name)
+	}
+	println("Copied: ", addon.Name)
 }
